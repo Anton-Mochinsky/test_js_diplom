@@ -12,6 +12,7 @@ import Undead from './characters/Undead';
 import Vampire from './characters/Vampire';
 // import Team from './Team';
 import GameState from './GameState';
+import cursors from './cursors';
 
 
 export default class GameController {
@@ -25,6 +26,9 @@ export default class GameController {
   }
 
   init() {
+    this.gamePlay.addCellEnterListener(this.onCellEnter.bind(this));
+    this.gamePlay.addCellLeaveListener(this.onCellLeave.bind(this));
+    this.gamePlay.addCellClickListener(this.onCellClick.bind(this));
     this.gamePlay.drawUi(themes.prairie);
     this.start();
   }
@@ -39,7 +43,59 @@ export default class GameController {
   }
 
   onCellEnter(index) {
-    // TODO: react to mouse enter
+    if (typeof this.currentCellIdx === 'number' && !this.gamePlay.cells[this.currentCellIdx].classList.contains('selected-yellow')) {
+      this.gamePlay.deselectCell(this.currentCellIdx);
+    }
+    const currentCell = this.gamePlay.cells[index];
+    const currentCellWithChar = currentCell.firstChild;
+    let isEnemy;
+    let isAvailableToMove;
+    let isAvailableToAttack;
+
+    // показать инфу (есть персонаж в клетке)
+    if (currentCellWithChar) {
+      this.gamePlay.setCursor(cursors.pointer);
+      this.gamePlay.showCellTooltip(getInfo(this.findCharacter(index)), index);
+      isEnemy = this.gameState.enemyTypes.some((item) => currentCellWithChar.classList.contains(item));
+    }
+
+    if (this.gameState.selectedCell) {
+      isAvailableToMove = this.availableTo(index, this.gameState.selectedCellCoordinates, this.gameState.selectedCharacter.moveDist);
+      isAvailableToAttack = this.availableTo(index, this.gameState.selectedCellCoordinates, this.gameState.selectedCharacter.attackDist);
+    }
+
+    // если есть выделенная клетка
+    if (this.gameState.selectedCell) {
+      // если наведенная клетка в зоне хода
+      if (isAvailableToMove) {
+        // если наведенная клетка пустая
+        if (!currentCellWithChar) {
+          this.gamePlay.setCursor(cursors.pointer);
+          this.gamePlay.selectCell(index, 'green');
+        }
+      // если наведенная клетка НЕ в зоне хода
+      } else {
+        this.gamePlay.setCursor(cursors.notallowed);
+      }
+
+      // если в клетке персонаж противника
+      if (currentCellWithChar && isEnemy) {
+        // если в зоне атаки
+        if (isAvailableToAttack) {
+          this.gamePlay.setCursor(cursors.crosshair);
+          this.gamePlay.selectCell(index, 'red');
+        } else {
+          this.gamePlay.setCursor(cursors.notallowed);
+        }
+      }
+    }
+
+    // если в наведенной клетке есть персонаж и он свой
+    if (currentCellWithChar && !isEnemy) {
+      this.gamePlay.setCursor(cursors.pointer);
+    }
+
+    this.currentCellIdx = index;
   }
 
   onCellLeave(index) {
